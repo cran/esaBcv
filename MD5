@@ -1,0 +1,14 @@
+2a2782936360b55ee3d99f6601bf1a0f *DESCRIPTION
+c539d83428c4087cf5daae24c7dca153 *NAMESPACE
+92c9bc9e0c0f492e692b5aa044408305 *R/ESA_BCV.R
+3fb10201d8971164fe937ffa94d6e70e *R/esaBcv-package.R
+cbdbc7c1cae24636b5837228a725936d *R/plot_esaBcv.R
+8f281c85ff6fdd8e26b525da4e2b41d6 *R/simdat.R
+034e9cf1418d90aaaf4e1ddedc887570 *data/datalist
+9e9e34318a1cab1f085487f2611561dc *data/simdat.rda
+d71e3763569545fb2314555e1448891c *man/ESA.Rd
+7bd1230852f17b061a5759b5230c1790 *man/EsaBcv.Rd
+bca387678e52e11849f0c3ec4e8b7b2f *man/PseudoInv.Rd
+f7d80c321ddc62483115e7f3a6d37473 *man/esaBcv_package.Rd
+8b511100e858f9163dd4d4bd64b46f23 *man/plot.esabcv.Rd
+9de3b3344a66e50c86fb9b543a0c825a *man/simdat.Rd
