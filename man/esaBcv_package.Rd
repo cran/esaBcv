@@ -25,6 +25,6 @@ Maintainer: Jingshu Wang <wangjingshususan@gmail.com>
 }
 \seealso{
 Owen and Wang (2015) Bi-cross-validation for factor analysis,
-\url{http://de.arxiv.org/pdf/1503.03515}
+\url{http://arxiv.org/abs/1503.03515}
 }
 

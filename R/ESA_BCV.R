@@ -10,15 +10,13 @@
 #' and \eqn{V'} represent _mu transposed_ and _V transposed_ respectively.
 #' The entries of \eqn{E} are assumed to be i.i.d. standard Gaussian.
 #' The model assumes heteroscedastic noises and especially works well for
-#' high-dimensional data. The method is based on Owen and Wang (2015). A warning is that
+#' high-dimensional data. The method is based on Owen and Wang (2015).  Notice that
 #' when nonnull \code{X} is given or centering the data is required (which is essentially
-#' adding a known covariate with all \eqn{1}), the method will first use linear regression
-#' to estimate the coefficients of the known covariates, and then estimate the latent factors
-#' from the residuals, whose low-rank part is actually the proportion of the latent factors 
-#' that are orthogonal to \code{X} minus the noises that are projected to \code{X}. Thus,
-#' to make the residuals still low rank, \code{k} should be a small number. Even though the 
-#' latent factors estimated from the residuals will be biased, the estimate of the whole
-#' signal (factor) matrix \code{S} will still be OK.
+#' adding a known covariate with all \eqn{1}), for identifiability, it's required that
+#' \eqn{<X, U> = 0} or \eqn{<1, U> = 0} respectively. Then the method will first make a rotation
+#' of the data matrix to remove the known predictors or centers, and then use 
+#' the latter \code{n - k} (or \code{n - k - 1} if centering is required) samples to 
+#' estimate the latent factors. The rotation idea first appears in Sun et.al. (2012).
 #'
 #' @param Y observed data matrix. p is the number of variables and 
 #' n is the sample size. Dimension is \code{c(n, p)}
@@ -36,7 +34,7 @@
 #' issues, "propack" fails for some matrices, and when that happens, 
 #' the function will use "fast" to
 #' compute the SVD of that matrix instead. Default method is "fast".
-#' @param center logical, whether to center the data before factor analysis.
+#' @param center logical, whether to add an intercept term in the model.
 #' Default is False. 
 #' @return \code{EsaBcv} returns an obejct of \code{\link[base]{class}} "esabcv" 
 #' The function \code{plot} plots the cross-validation results and points out the  
@@ -64,7 +62,8 @@
 #' Y <- matrix(rnorm(100), nrow = 10)
 #' EsaBcv(Y)
 #' @references Art B. Owen and Jingshu Wang(2015), Bi-cross-validation for factor analysis,
-#' \url{http://de.arxiv.org/pdf/1503.03515}
+#' \url{http://arxiv.org/abs/1503.03515}
+#' @references Yunting Sun, Nancy R. Zhang and Art B. Owen, Multiple hypothesis testing adjusted for latent variables, with an application to the AGEMAP gene expression data. The Annuals of Applied Statistics, 6(4): 1664-1688, 2012
 #' @seealso \code{\link{ESA}}, \code{\link{plot.esabcv}}
 #' @importFrom corpcor fast.svd
 #' @importFrom svd propack.svd
@@ -72,10 +71,23 @@
 EsaBcv <- function (Y, X = NULL, r.limit = 20, niter = 3, nRepeat = 12,
                     only.r = F, svd.method = "fast", center = F){ 
 	Y <- as.matrix(Y);
-    Y <- scale(Y, center = center, scale = F)
-    mu <- attr(Y, "scaled:center");
     p <- ncol(Y);
     n <- nrow(Y);
+    X.ori <- X;
+    if (center) 
+    	X <- cbind(rep(1, n), X);
+    qr.X <- NULL;
+    Y.ori <- Y;
+    if(!is.null(X)) {
+		X <- as.matrix(X);
+		k <- ncol(X);
+		if (k >= n)
+			stop("Too many predictors!! The number of predictors 
+			     is expected to be much less than the sample size!")
+		qr.X <- qr(X);
+		Y <- qr.qty(qr.X, Y)[-(1:k), ];
+		n <- n-k;
+    } 
     ## decide the held-in size
     gamma <- p/n;
     bar.gamma <- ((sqrt(gamma) + sqrt(1/gamma))/2)^2;
@@ -89,23 +101,7 @@ EsaBcv <- function (Y, X = NULL, r.limit = 20, niter = 3, nRepeat = 12,
         n1 <- held.in.size.large;
         p1 <- held.in.size.small;
     }
-	Y.ori <- Y;
-    if(!is.null(X)) {
-		if (is.vector(X))
-			X <- as.matrix(X);
-		k <- ncol(X);
-		if (k >= n - ifelse(center, 1, 0))
-			stop("Too many predictors!! X (or centered X) should be in full rank!!")
-		# beta is k * p
-		X <- scale(X, center = center, scale = F)
-        beta <- solve(t(X) %*% X) %*% t(X) %*% Y;
-        R <- Y - X %*% beta;
-        Y <- R;
-    } else {
-        beta <- NULL;
-        k <- 0;
-    }
-    max.r <- min(n1, p1, n - 1 - k, p - 1 - k)
+    max.r <- min(n1, p1);
     if(max.r > r.limit)
         max.r <- r.limit;
     if (is.null(nRepeat)) {
@@ -130,11 +126,10 @@ EsaBcv <- function (Y, X = NULL, r.limit = 20, niter = 3, nRepeat = 12,
 
     if (only.r)
         return(list(result.list = result.list, best.r = best.r));
-
-    est <- ESA(Y.ori, best.r, X, center, niter, svd.method);
+    est <- ESA(Y.ori, best.r, X.ori, center, niter, svd.method);
     result <- list(best.r = best.r, estSigma = est$estSigma, estU = est$estU, 
-				estD = est$estD, estV = est$estV, beta = beta,
-				estS = est$estS, mu = mu, max.r = max.r, 
+				estD = est$estD, estV = est$estV, beta = est$beta,
+				estS = est$estS, mu = est$mu, max.r = max.r, 
 				result.list = result.list);
 	class(result) <- "esabcv"
     return(result);
@@ -189,17 +184,16 @@ BcvPerFoldGivenRank <- function(Y00, Y01, Y10, Y11, r, niter, svd.method,
     return (est.error);
 }
 
-#' Moore-Penrose Pseudo Inverse of A Matrix
-#'
-#' Calculate the Moore-Penrose pseudo inverse of matrix \code{Y} up to a given rank
-#'
-#' This function does similar things as \code{\link[MASS]{ginv}} in package MASS while controls 
-#' the rank.
-#'
-#' @param Y the given matrix
-#' @param k the given rank
-#' @inheritParams EsaBcv
-#' @return A pseudo-inverse matrix of rank \code{k}
+## Moore-Penrose Pseudo Inverse of A Matrix
+#
+# Calculate the Moore-Penrose pseudo inverse of matrix \code{Y} up to a given rank
+#
+# This function does similar things as \code{\link[MASS]{ginv}} in package MASS while controls 
+# the rank.
+#
+# Y the given matrix
+# k the given rank
+# A pseudo-inverse matrix of rank \code{k}
 PseudoInv <- function(Y, k, svd.method = "fast") {
     svd.trunc <- ComputeSVD(Y, svd.method, k);
       tol <- sqrt(.Machine$double.eps);
@@ -222,15 +216,13 @@ PseudoInv <- function(Y, k, svd.method = "fast") {
 #' and \eqn{V'} mean _mu transposed_ and _V transposed_ respectively.
 #' The entries of \eqn{E} are assumed to be i.i.d. standard Gaussian.
 #' The model assumes heteroscedastic noises and especially works well for
-#' high-dimensional data. The method is based on Owen and Wang (2015). A warning is that
+#' high-dimensional data. The method is based on Owen and Wang (2015). Notice that
 #' when nonnull \code{X} is given or centering the data is required (which is essentially
-#' adding a known covariate with all \eqn{1}), the method will first use linear regression
-#' to estimate the coefficients of the known covariates, and then estimate the latent factors
-#' from the residuals, whose low-rank part is actually the proportion of the latent factors 
-#' that are orthogonal to \code{X} minus the noises that are projected to \code{X}. Thus,
-#' to make the residuals still low rank, \code{k} should be a small number. Even though the 
-#' latent factors estimated from the residuals will be biased, the estimate of the whole
-#' signal (factor) matrix \code{S} will still be OK.
+#' adding a known covariate with all \eqn{1}), for identifiability, it's required that
+#' \eqn{<X, U> = 0} or \eqn{<1, U> = 0} respectively. Then the method will first make a rotation
+#' of the data matrix to remove the known predictors or centers, and then use 
+#' the latter \code{n - k} (or \code{n - k - 1} if centering is required) samples to 
+#' estimate the latent factors.
 #'
 #' @inheritParams EsaBcv
 #' @param r The number of factors to use
@@ -252,28 +244,41 @@ PseudoInv <- function(Y, k, svd.method = "fast") {
 #' Y <- matrix(rnorm(100), nrow = 10) + 3 * rnorm(10) %*% t(rep(1, 10))
 #' ESA(Y, 1)
 #' @references Art B. Owen and Jingshu Wang(2015), Bi-cross-validation for factor analysis,
-#' \url{http://de.arxiv.org/pdf/1503.03515}
+#' \url{http://arxiv.org/abs/1503.03515}
 
 #' @export
 ESA <- function(Y, r, X = NULL, center = F, niter = 3, svd.method = "fast"){
 
     Y <- as.matrix(Y);
-    Y <- scale(Y, center = center, scale = F);
-    mu <- attr(Y, "scaled:center");
     p <- ncol(Y);
     n <- nrow(Y);
+    Y.ori <- Y;
+    if (center) 
+    	X <- cbind(rep(1, n), X);
+    qr.X <- NULL;
     if(!is.null(X)) {
 		X <- as.matrix(X);
 		k <- ncol(X);
-		if (k >= n - ifelse(center, 1, 0))
-			stop("Too many predictors!! X should be in full rank!!")
-		X <- scale(X, center, scale = F);
-        # beta is k * p
-        beta <- solve(t(X) %*% X) %*% t(X) %*% Y;
-        R <- Y - X %*%  beta;
-        Y <- R;
-    }else{
-        beta <- NULL;
+		if (k >= n)
+			stop("Too many predictors!! The number of predictors 
+			     is expected to be much less than the sample size!")
+		qr.X <- qr(X);
+		beta <- qr.coef(qr.X, Y);
+		if (center) {
+			mu <- beta[1, ];
+			if (k == 1) {
+				beta1 <- NULL;
+			} else
+				beta1 <- beta[-1, ];
+		} else {
+			mu <- NULL;
+			beta1 <- beta;
+		}
+		Y <- qr.qty(qr.X, Y)[-(1:k), ];
+		n <- n-k;
+    } else {
+        beta1 <- NULL;
+        mu <- NULL;
     }
     
     # initializing Sigma
@@ -281,12 +286,17 @@ ESA <- function(Y, r, X = NULL, center = F, niter = 3, svd.method = "fast"){
 
     if (r == 0)
         return(list(estSigma = Sigma, estU = NULL, estD = NULL, 
-                    estV = NULL, estS = NULL, beta = beta, mu = mu));
+                    estV = NULL, estS = NULL, beta = beta1, mu = mu));
     if (r >= min(p, n)) {
         svd.Y <- ComputeSVD(Y, svd.method = svd.method);
-        return(list(estSigma = rep(0,p), estU = svd.Y$u, 
+        if (!is.null(X)) {
+        	estU <- qr.qy(qr.X, rbind(matrix(rep(0, k * r), nrow = k), 
+        						      svd.Y$u))
+        } else
+        	estU <- svd.Y$u
+        return(list(estSigma = rep(0,p), estU = estU, 
                     estD = svd.Y$d / sqrt(n),
-                    estV = svd.Y$v, estS = Y, beta = beta, mu = mu));   
+                    estV = svd.Y$v, estS = Y.ori, beta = beta1, mu = mu));   
     } 
 
     iter <- 0;
@@ -307,15 +317,18 @@ ESA <- function(Y, r, X = NULL, center = F, niter = 3, svd.method = "fast"){
         res <- Y - estU %*% estD %*% t(estV);
         Sigma <- apply(res, 2, function(x) sum(x^2)/length(x));
     }
+    if (!is.null(X)) 
+		estU <- rbind(matrix(rep(0, k * r), nrow = k), estU);
     estS <- estU %*% estD %*% t(estV);
     svd.Y <- ComputeSVD(estS, svd.method, r);
-	if (!is.null(X)) 
+	if (!is.null(X)) {
+		estU <- qr.qy(qr.X, svd.Y$u);
 		estS <- estS + X %*% beta;
-	if (center)
-		estS <- t(mu + t(estS));    
+	} else
+		estU <- svd.Y$u;
     estD <- svd.Y$d[1:r]/sqrt(n);
-    return(list(estSigma = Sigma, estU = svd.Y$u, estD = estD, 
-                estV = svd.Y$v, estS = estS, beta = beta, mu = mu));    
+    return(list(estSigma = Sigma, estU = estU, estD = estD, 
+                estV = svd.Y$v, estS = estS, beta = beta1, mu = mu));    
 }
 
 
@@ -345,7 +358,6 @@ ComputeSVD <- function(Y, svd.method = "fast", rank = NULL, kmax.r = 10) {
         svd.Y <- fast.svd(Y, tol);
 
         if (rank < min(dim(Y))) {
-
             svd.Y$u <- matrix(svd.Y$u[, 1:rank], ncol = rank);
             svd.Y$v <- matrix(svd.Y$v[, 1:rank], ncol = rank);
             svd.Y$d <- svd.Y$d[1:rank];

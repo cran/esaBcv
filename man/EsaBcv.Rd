@@ -31,7 +31,7 @@ issues, "propack" fails for some matrices, and when that happens,
 the function will use "fast" to
 compute the SVD of that matrix instead. Default method is "fast".}
 
-\item{center}{logical, whether to center the data before factor analysis.
+\item{center}{logical, whether to add an intercept term in the model.
 Default is False.}
 }
 \value{
@@ -70,15 +70,13 @@ are orthogonal and \eqn{mu'}
 and \eqn{V'} represent _mu transposed_ and _V transposed_ respectively.
 The entries of \eqn{E} are assumed to be i.i.d. standard Gaussian.
 The model assumes heteroscedastic noises and especially works well for
-high-dimensional data. The method is based on Owen and Wang (2015). A warning is that
+high-dimensional data. The method is based on Owen and Wang (2015).  Notice that
 when nonnull \code{X} is given or centering the data is required (which is essentially
-adding a known covariate with all \eqn{1}), the method will first use linear regression
-to estimate the coefficients of the known covariates, and then estimate the latent factors
-from the residuals, whose low-rank part is actually the proportion of the latent factors
-that are orthogonal to \code{X} minus the noises that are projected to \code{X}. Thus,
-to make the residuals still low rank, \code{k} should be a small number. Even though the
-latent factors estimated from the residuals will be biased, the estimate of the whole
-signal (factor) matrix \code{S} will still be OK.
+adding a known covariate with all \eqn{1}), for identifiability, it's required that
+\eqn{<X, U> = 0} or \eqn{<1, U> = 0} respectively. Then the method will first make a rotation
+of the data matrix to remove the known predictors or centers, and then use
+the latter \code{n - k} (or \code{n - k - 1} if centering is required) samples to
+estimate the latent factors. The rotation idea first appears in Sun et.al. (2012).
 }
 \examples{
 Y <- matrix(rnorm(100), nrow = 10)
@@ -86,7 +84,9 @@ EsaBcv(Y)
 }
 \references{
 Art B. Owen and Jingshu Wang(2015), Bi-cross-validation for factor analysis,
-\url{http://de.arxiv.org/pdf/1503.03515}
+\url{http://arxiv.org/abs/1503.03515}
+
+Yunting Sun, Nancy R. Zhang and Art B. Owen, Multiple hypothesis testing adjusted for latent variables, with an application to the AGEMAP gene expression data. The Annuals of Applied Statistics, 6(4): 1664-1688, 2012
 }
 \seealso{
 \code{\link{ESA}}, \code{\link{plot.esabcv}}

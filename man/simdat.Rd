@@ -12,7 +12,7 @@ where \eqn{D} and \eqn{\Sigma} are diagonal matrices, and \eqn{U} and \eqn{V}
 are orthogonal. \eqn{V'} means _V transposed_. For the factors, we include one giant
 factor, five useful factors, one harmful factor and one undetectable factor.
 For more details of the simulation method
-used, please refer to Appendix A.1 of Owen and Wang (2015) Bi-cross-validation for factor analysis, \url{http://de.arxiv.org/pdf/1503.03515}.
+used, please refer to Appendix A.1 of Owen and Wang (2015) Bi-cross-validation for factor analysis, \url{http://arxiv.org/abs/1503.03515}.
 }
 \details{
 The dataset is a list of components:
