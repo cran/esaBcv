@@ -142,8 +142,8 @@ BcvGivenRank <- function (Y, r, niter, n1, p1, svd.method) {
     n <- nrow(Y);
     hp <- p - p1;
     hn <- n - n1;
-    bcv.result <- BcvPerFoldGivenRank(Y[1:hn, 1:hp], Y[1:hn, -(1:hp)],
-                                        Y[-(1:hn), 1:hp], Y[-(1:hn), -(1:hp)],
+    bcv.result <- BcvPerFoldGivenRank(Y[1:hn, 1:hp, drop = F], Y[1:hn, -(1:hp), drop = F],
+                                        Y[-(1:hn), 1:hp, drop = F], Y[-(1:hn), -(1:hp), drop = F],
                                         r, niter, svd.method);
 
     return(bcv.result);
